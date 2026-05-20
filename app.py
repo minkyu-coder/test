@@ -1,3 +1,3 @@
 import streamlit as st
 st.title('박민규 화이팅')
-st.write('방준희 얼굴 재미있다!!')
+st.write('야르 재미있다!!')
