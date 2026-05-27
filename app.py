@@ -1,73 +1,110 @@
 import streamlit as st
-import pandas as pd
-import numpy as np
+import google.generativeai as genai
 
+# -----------------------------
 # 페이지 설정
+# -----------------------------
 st.set_page_config(
-    page_title="My Streamlit App",
-    page_icon="🚀",
-    layout="wide"
+    page_title="공부 도우미 챗봇",
+    page_icon="📚",
+    layout="centered"
 )
 
-# 제목
-st.title("🚀 Streamlit 웹앱")
-st.write("첫 번째 웹앱입니다!")
+st.title("📚 공부 도우미 Gemini 챗봇")
+st.caption("Gemini 2.5 Flash Lite 기반 AI 공부 챗봇")
 
-# 사이드바
-st.sidebar.header("메뉴")
+# -----------------------------
+# API KEY 불러오기
+# -----------------------------
+try:
+    api_key = st.secrets["GEMINI_API_KEY"]
+except Exception:
+    st.error("❌ secrets.toml에 GEMINI_API_KEY가 설정되지 않았습니다.")
+    st.stop()
 
-menu = st.sidebar.selectbox(
-    "기능 선택",
-    ["홈", "데이터", "차트", "입력폼"]
+# -----------------------------
+# Gemini 설정
+# -----------------------------
+genai.configure(api_key=api_key)
+
+# 모델 생성
+model = genai.GenerativeModel(
+    model_name="gemini-2.5-flash-lite"
 )
 
-# 홈
-if menu == "홈":
-    st.header("홈 화면")
+# -----------------------------
+# 세션 상태 초기화
+# -----------------------------
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-    st.success("웹앱 실행 성공!")
+# -----------------------------
+# 이전 채팅 출력
+# -----------------------------
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-    if st.button("클릭"):
-        st.balloons()
+# -----------------------------
+# 사용자 입력
+# -----------------------------
+prompt = st.chat_input("공부 질문을 입력하세요!")
 
-# 데이터
-elif menu == "데이터":
-    st.header("데이터 테이블")
+if prompt:
 
-    df = pd.DataFrame({
-        "이름": ["김", "이", "박", "최"],
-        "점수": [95, 88, 76, 100]
+    # 사용자 메시지 저장
+    st.session_state.messages.append({
+        "role": "user",
+        "content": prompt
     })
 
-    st.dataframe(df)
+    # 사용자 메시지 출력
+    with st.chat_message("user"):
+        st.markdown(prompt)
 
-# 차트
-elif menu == "차트":
-    st.header("랜덤 차트")
+    # AI 응답 생성
+    with st.chat_message("assistant"):
 
-    chart_data = pd.DataFrame(
-        np.random.randn(20, 3),
-        columns=["A", "B", "C"]
-    )
+        with st.spinner("공부 중..."):
 
-    st.line_chart(chart_data)
+            try:
+                # 대화 기록 구성
+                chat_history = []
 
-# 입력폼
-elif menu == "입력폼":
-    st.header("사용자 입력")
+                for msg in st.session_state.messages:
+                    role = "user" if msg["role"] == "user" else "model"
 
-    name = st.text_input("이름")
+                    chat_history.append({
+                        "role": role,
+                        "parts": [msg["content"]]
+                    })
 
-    age = st.slider("나이", 1, 100, 20)
+                # 응답 생성
+                response = model.generate_content(chat_history)
 
-    hobby = st.selectbox(
-        "취미",
-        ["게임", "운동", "음악", "코딩"]
-    )
+                reply = response.text
 
-    if st.button("제출"):
-        st.write(f"이름: {name}")
-        st.write(f"나이: {age}")
-        st.write(f"취미: {hobby}")
+            except Exception as e:
+                reply = f"❌ 오류가 발생했습니다.\n\n{str(e)}"
 
-        st.success("제출 완료!")
+            st.markdown(reply)
+
+    # AI 응답 저장
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": reply
+    })
+
+# -----------------------------
+# 사이드바
+# -----------------------------
+with st.sidebar:
+    st.header("⚙️ 설정")
+
+    if st.button("채팅 기록 초기화"):
+        st.session_state.messages = []
+        st.rerun()
+
+    st.markdown("---")
+    st.markdown("### 📌 사용 모델")
+    st.code("gemini-2.5-flash-lite")
